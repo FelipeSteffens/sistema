@@ -14,7 +14,7 @@ export async function register(req, res){
         return res.status(400).json({message: "Informe os campos necessarios para realizar o registro!"})
     }
 
-    const [usuarios] = await db.query("SELECT id FROM usuarios WHERE email = ?", [email])
+    const [usuarios] = await db.query("SELECT id FROM clientes WHERE email = ?", [email])
 
     if(usuarios.length > 0){
         return res.status(409).json({message: "Email já cadastrado!"})
@@ -22,7 +22,7 @@ export async function register(req, res){
     const senhaHash = await bcrypt.hash(senha, 10)
 
     try {
-        await db.query("INSERT INTO usuarios(nome, email, senha) VALUES (?, ?, ?)", [nome, email, senhaHash])
+        await db.query("INSERT INTO clientes(nome, email, senha) VALUES (?, ?, ?)", [nome, email, senhaHash])
     } catch (error) {
         return res.status(400).json({message: "Dados Inválidos."})
     }
@@ -30,8 +30,8 @@ export async function register(req, res){
 }
 
 
-export async function login(res, req){
-    const {email, senha} = req.body | {};
+export async function login(req, res){
+    const {email, senha} = req.body || {};
 
     if(
         typeof email !== "string"|| !email.trim() ||
@@ -40,17 +40,19 @@ export async function login(res, req){
         return res.status(400).json({message: "Email ou senha incorreto"})
     }
 
-    const [rows] = await db.query("SELECT id, name, email, senha FROM usuarios WHERE email = ?", [email.trim()])
+    const [rows] = await db.query("SELECT id, nome, email, senha FROM clientes WHERE email = ?", [email.trim()])
 
     const usuarios = rows[0]
 
-    if(!usuarios || !(await bcrypt.compare(senha, usuarios.senhaHash))) {
+    if(!usuarios || !(await bcrypt.compare(senha, usuarios.senha))) {
         return res.status(401).json({message: "Email ou senha inválidos!"})
     }
 
-    const token = jwt.sign (
-        process.env.JWT_SECRET, { subject: String(usuarios.id), expiresIn: "1m", algorithm : "HS256"}
-    )
+   const token = jwt.sign(
+    { id: usuarios.id },
+    process.env.JWT_SECRET, 
+    { subject: String(usuarios.id), expiresIn: "1h", algorithm: "HS256" }
+);
 
     return res.json({
         token,
